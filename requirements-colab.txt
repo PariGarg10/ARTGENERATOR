@@ -1,0 +1,20 @@
+# Pinned stack tested on Google Colab (Python 3.10/3.11, T4/L4 GPU).
+# Install AFTER cloning the repo: pip install -r requirements-colab.txt
+
+torch>=2.3.0
+torchvision>=0.18.0
+diffusers==0.31.0
+transformers==4.46.3
+tokenizers==0.20.1
+accelerate==0.34.2
+peft==0.13.2
+bitsandbytes>=0.43.0
+safetensors>=0.4.5
+Pillow>=10.4.0
+opencv-python-headless>=4.10.0.84
+tqdm>=4.66.5
+numpy>=1.26.4
+sentencepiece>=0.2.0
+protobuf>=5.27.0
+einops>=0.8.0
+timm>=1.0.11

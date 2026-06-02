@@ -1,8 +1,11 @@
 # Minimal FLUX.1 + LoRA Generator
 
 This project is a lightweight custom-style image generator:
-- train **once** with your dataset using LoRA on FLUX.1-dev (Colab-friendly),
+- train **once** with your dataset using LoRA on FLUX (Colab-friendly),
 - then generate unlimited images from prompts in that learned style.
+
+**Free Colab profile (recommended):** `FLUX.1-schnell`, 512px, rank 4, memory-saving flags.
+**High-VRAM profile:** `FLUX.1-dev`, 1024px, rank 8 (A100 / 24GB+).
 
 ## Folder Structure
 
@@ -57,12 +60,14 @@ mystyle, a hot air balloon in a bright sky
 
 Open `train_flux_lora.ipynb` in Google Colab and run all cells.
 
-Default training settings (free Colab optimized):
-- Resolution: 1024
-- Batch size: 1
-- LoRA rank: 8
-- Epochs: 10
-- Learning rate: 1e-4
+The notebook uses the **free Colab profile**:
+- Base model: `FLUX.1-schnell`
+- Resolution: 512
+- Batch size: 1, LoRA rank: 4
+- Memory flags: gradient checkpointing, fp16, 8-bit Adam, latent caching
+- Libraries: install from `requirements-colab.txt` (pinned versions)
+
+For high-VRAM GPUs, use `--profile high_vram` instead.
 
 Expected output:
 
@@ -73,7 +78,12 @@ training/output/mystyle_flux_lora.safetensors
 ## 5) Local inference (script)
 
 ```bash
-python inference/generate.py --prompt "a cozy cafe in rain" --lora_path ./training/output/mystyle_flux_lora.safetensors --output ./inference/outputs/sample.png
+python inference/generate.py \
+  --prompt "a cozy cafe in rain" \
+  --lora_path ./training/output/mystyle_flux_lora.safetensors \
+  --base_model black-forest-labs/FLUX.1-schnell \
+  --width 512 --height 512 \
+  --output ./inference/outputs/sample.png
 ```
 
 Generation prompt is automatically prefixed:
@@ -93,5 +103,7 @@ UI includes:
 
 ## Notes
 
-- FLUX.1-dev is heavy; free Colab VRAM can be tight. Keep dataset small and clean.
-- If VRAM errors happen, reduce effective training steps and keep rank/batch unchanged.
+- Free Colab (~15 GB VRAM): use `FLUX.1-schnell` and `--profile free_colab` (default).
+- FLUX.1-dev often OOMs on free T4; use `--profile high_vram` only on A100/L4 with 24GB+.
+- Accept the Hugging Face license and log in before training gated FLUX models.
+- If VRAM errors persist, keep resolution at 512 and rank at 4; do not increase batch size.
