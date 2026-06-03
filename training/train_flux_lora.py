@@ -24,6 +24,13 @@ from pathlib import Path
 FREE_COLAB_MODEL = "black-forest-labs/FLUX.1-schnell"
 HIGH_VRAM_MODEL = "black-forest-labs/FLUX.1-dev"
 
+# Must match requirements-colab.txt; training script is downloaded from this tag.
+DIFFUSERS_TRAIN_TAG = "v0.34.0"
+DIFFUSERS_TRAIN_SCRIPT = (
+    f"https://raw.githubusercontent.com/huggingface/diffusers/{DIFFUSERS_TRAIN_TAG}/"
+    "examples/dreambooth/train_dreambooth_lora_flux.py"
+)
+
 PROFILE_DEFAULTS = {
     "free_colab": {
         "base_model": FREE_COLAB_MODEL,
@@ -51,19 +58,19 @@ PROFILE_DEFAULTS = {
 
 
 def ensure_diffusers_script(script_path: Path) -> None:
-    if script_path.exists():
-        return
     script_path.parent.mkdir(parents=True, exist_ok=True)
+    version_marker = script_path.parent / ".diffusers_train_tag"
+
+    if script_path.exists() and version_marker.exists():
+        if version_marker.read_text(encoding="utf-8").strip() == DIFFUSERS_TRAIN_TAG:
+            return
+        script_path.unlink(missing_ok=True)
+
     subprocess.run(
-        [
-            "curl",
-            "-L",
-            "https://raw.githubusercontent.com/huggingface/diffusers/main/examples/dreambooth/train_dreambooth_lora_flux.py",
-            "-o",
-            str(script_path),
-        ],
+        ["curl", "-L", DIFFUSERS_TRAIN_SCRIPT, "-o", str(script_path)],
         check=True,
     )
+    version_marker.write_text(DIFFUSERS_TRAIN_TAG, encoding="utf-8")
 
 
 def count_training_images(dataset_dir: Path) -> int:
