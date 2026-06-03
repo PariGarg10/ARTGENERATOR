@@ -105,6 +105,39 @@ def ensure_diffusers_script(script_path: Path) -> None:
     print(f"Downloaded training script from {DIFFUSERS_TRAIN_TAG}")
 
 
+def verify_hf_model_access(model_id: str) -> None:
+    """Fail early if FLUX weights cannot be downloaded (login or license missing)."""
+    try:
+        from huggingface_hub import whoami
+    except ImportError as exc:
+        raise RuntimeError("Install huggingface_hub: pip install huggingface_hub") from exc
+
+    try:
+        whoami()
+    except Exception as exc:
+        raise RuntimeError(
+            "Not logged in to Hugging Face. In Colab run the login cell first:\n"
+            "  from huggingface_hub import login\n"
+            "  login()\n"
+            "Also accept the model license on the model page."
+        ) from exc
+
+    try:
+        from transformers import CLIPTokenizer
+
+        CLIPTokenizer.from_pretrained(model_id, subfolder="tokenizer")
+        print(f"Hugging Face access OK for: {model_id}")
+    except OSError as exc:
+        raise RuntimeError(
+            f"Cannot download tokenizer for {model_id}.\n"
+            "Fix:\n"
+            f"  1) Open https://huggingface.co/{model_id} and click 'Agree and access repository'\n"
+            "  2) Create a token at https://huggingface.co/settings/tokens (read access)\n"
+            "  3) Run: from huggingface_hub import login; login()\n"
+            "  4) Re-run training"
+        ) from exc
+
+
 def count_training_images(dataset_dir: Path) -> int:
     extensions = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
     return sum(1 for path in dataset_dir.iterdir() if path.suffix.lower() in extensions)
@@ -130,6 +163,7 @@ def run_training(args: argparse.Namespace) -> None:
     ensure_diffusers_script(script_path)
 
     settings = resolve_profile(args)
+    verify_hf_model_access(settings["base_model"])
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
