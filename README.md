@@ -23,6 +23,7 @@ project/
 ├── gradio_app.py
 ├── requirements.txt
 ├── train_flux_lora.ipynb
+├── train_flux_lora_high_vram.ipynb
 └── README.md
 ```
 
@@ -58,7 +59,12 @@ mystyle, a hot air balloon in a bright sky
 
 ## 4) Train LoRA on Colab (recommended)
 
-Open `train_flux_lora.ipynb` in Google Colab and run all cells.
+| Notebook | When to use |
+|----------|-------------|
+| `train_flux_lora.ipynb` | Free Colab (~12GB RAM / 15GB VRAM) — schnell, 384px, rank 2, 4-bit |
+| `train_flux_lora_high_vram.ipynb` | A100 / 24GB+ VRAM — FLUX.1-dev, 1024px, rank 8 (original quality) |
+
+Open the matching notebook in Google Colab and run all cells.
 
 The notebook uses the **free Colab profile** (12GB RAM / 15GB VRAM):
 - Base model: `FLUX.1-schnell`
