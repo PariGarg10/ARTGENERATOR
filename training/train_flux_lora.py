@@ -57,10 +57,23 @@ PROFILE_DEFAULTS = {
 }
 
 
-def ensure_diffusers_script(script_path: Path) -> None:
-    script_path.parent.mkdir(parents=True, exist_ok=True)
-    version_marker = script_path.parent / ".diffusers_train_tag"
+def bundled_training_script() -> Path:
+    """Use the script committed in-repo (diffusers v0.34.0 compatible)."""
+    return Path(__file__).resolve().parent / "_hf_scripts" / "train_dreambooth_lora_flux.py"
 
+
+def ensure_diffusers_script(script_path: Path) -> None:
+    bundled = bundled_training_script()
+    script_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if bundled.exists():
+        if bundled.resolve() != script_path.resolve():
+            script_path.write_text(bundled.read_text(encoding="utf-8"), encoding="utf-8")
+        version_marker = script_path.parent / ".diffusers_train_tag"
+        version_marker.write_text(DIFFUSERS_TRAIN_TAG, encoding="utf-8")
+        return
+
+    version_marker = script_path.parent / ".diffusers_train_tag"
     if script_path.exists() and version_marker.exists():
         if version_marker.read_text(encoding="utf-8").strip() == DIFFUSERS_TRAIN_TAG:
             return
