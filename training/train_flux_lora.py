@@ -2,7 +2,7 @@
 Train FLUX LoRA using the official Diffusers dreambooth LoRA script.
 
 Includes two ready-to-run profiles:
-- free_colab: FLUX.1-schnell, 512px, rank 4, memory-saving flags (T4/L4 ~15GB VRAM)
+- free_colab: FLUX.1-schnell, 384px, rank 2, 4-bit NF4 transformer (12GB RAM / 15GB VRAM Colab)
 - high_vram:  FLUX.1-dev, 1024px, rank 8 (A100 / 24GB+ VRAM)
 
 Usage (free Colab):
@@ -34,14 +34,15 @@ DIFFUSERS_TRAIN_SCRIPT = (
 PROFILE_DEFAULTS = {
     "free_colab": {
         "base_model": FREE_COLAB_MODEL,
-        "resolution": 512,
+        "resolution": 384,
         "batch_size": 1,
-        "rank": 4,
-        "epochs": 10,
+        "rank": 2,
+        "epochs": 6,
         "learning_rate": 1e-4,
         "mixed_precision": "fp16",
         "gradient_accumulation_steps": 1,
         "memory_saving": True,
+        "low_ram": True,
     },
     "high_vram": {
         "base_model": HIGH_VRAM_MODEL,
@@ -155,6 +156,7 @@ def resolve_profile(args: argparse.Namespace) -> dict:
         "mixed_precision": args.mixed_precision or profile["mixed_precision"],
         "gradient_accumulation_steps": args.gradient_accumulation_steps or profile["gradient_accumulation_steps"],
         "memory_saving": profile["memory_saving"] and not args.no_memory_saving,
+        "low_ram": profile.get("low_ram", False),
     }
 
 
@@ -222,7 +224,12 @@ def run_training(args: argparse.Namespace) -> None:
             ]
         )
 
+    if settings["low_ram"]:
+        command.append("--low_ram")
+
     print("Training profile:", args.profile)
+    if settings["low_ram"]:
+        print("Low-RAM mode: 4-bit NF4 transformer (for 12GB system RAM Colab)")
     print("Base model:", settings["base_model"])
     print("Resolution:", settings["resolution"])
     print("Rank:", settings["rank"])

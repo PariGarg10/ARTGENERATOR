@@ -33,7 +33,7 @@ from accelerate.logging import get_logger
 from accelerate.utils import DistributedDataParallelKwargs, ProjectConfiguration, set_seed
 from huggingface_hub import create_repo, upload_folder
 from huggingface_hub.utils import insecure_hashlib
-from peft import LoraConfig, set_peft_model_state_dict
+from peft import LoraConfig, prepare_model_for_kbit_training, set_peft_model_state_dict
 from peft.utils import get_peft_model_state_dict
 from PIL import Image
 from PIL.ImageOps import exif_transpose
@@ -46,6 +46,7 @@ from transformers import CLIPTokenizer, PretrainedConfig, T5TokenizerFast
 import diffusers
 from diffusers import (
     AutoencoderKL,
+    BitsAndBytesConfig,
     FlowMatchEulerDiscreteScheduler,
     FluxPipeline,
     FluxTransformer2DModel,
@@ -155,11 +156,15 @@ Please adhere to the licensing terms as described [here](https://huggingface.co/
 
 
 def load_text_encoders(class_one, class_two):
+    load_kwargs = {"revision": args.revision, "variant": args.variant}
+    if args.low_ram:
+        load_kwargs["low_cpu_mem_usage"] = True
+        load_kwargs["torch_dtype"] = torch.float16
     text_encoder_one = class_one.from_pretrained(
-        args.pretrained_model_name_or_path, subfolder="text_encoder", revision=args.revision, variant=args.variant
+        args.pretrained_model_name_or_path, subfolder="text_encoder", **load_kwargs
     )
     text_encoder_two = class_two.from_pretrained(
-        args.pretrained_model_name_or_path, subfolder="text_encoder_2", revision=args.revision, variant=args.variant
+        args.pretrained_model_name_or_path, subfolder="text_encoder_2", **load_kwargs
     )
     return text_encoder_one, text_encoder_two
 
@@ -630,6 +635,11 @@ def parse_args(input_args=None):
         action="store_true",
         default=False,
         help="Cache the VAE latents",
+    )
+    parser.add_argument(
+        "--low_ram",
+        action="store_true",
+        help="4-bit NF4 transformer + low_cpu_mem_usage loads for 12GB RAM Colab.",
     )
     parser.add_argument(
         "--report_to",
@@ -1187,10 +1197,30 @@ def main(args):
         subfolder="vae",
         revision=args.revision,
         variant=args.variant,
+        low_cpu_mem_usage=args.low_ram,
     )
-    transformer = FluxTransformer2DModel.from_pretrained(
-        args.pretrained_model_name_or_path, subfolder="transformer", revision=args.revision, variant=args.variant
-    )
+    if args.low_ram:
+        bnb_compute_dtype = torch.float16
+        nf4_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_compute_dtype=bnb_compute_dtype,
+        )
+        transformer = FluxTransformer2DModel.from_pretrained(
+            args.pretrained_model_name_or_path,
+            subfolder="transformer",
+            revision=args.revision,
+            variant=args.variant,
+            quantization_config=nf4_config,
+            torch_dtype=bnb_compute_dtype,
+            device_map=str(accelerator.device),
+            low_cpu_mem_usage=True,
+        )
+        transformer = prepare_model_for_kbit_training(transformer, use_gradient_checkpointing=False)
+    else:
+        transformer = FluxTransformer2DModel.from_pretrained(
+            args.pretrained_model_name_or_path, subfolder="transformer", revision=args.revision, variant=args.variant
+        )
 
     # We only train the additional adapter LoRA layers
     transformer.requires_grad_(False)
@@ -1213,7 +1243,8 @@ def main(args):
         )
 
     vae.to(accelerator.device, dtype=weight_dtype)
-    transformer.to(accelerator.device, dtype=weight_dtype)
+    if not args.low_ram:
+        transformer.to(accelerator.device, dtype=weight_dtype)
     text_encoder_one.to(accelerator.device, dtype=weight_dtype)
     text_encoder_two.to(accelerator.device, dtype=weight_dtype)
 

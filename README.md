@@ -60,10 +60,11 @@ mystyle, a hot air balloon in a bright sky
 
 Open `train_flux_lora.ipynb` in Google Colab and run all cells.
 
-The notebook uses the **free Colab profile**:
+The notebook uses the **free Colab profile** (12GB RAM / 15GB VRAM):
 - Base model: `FLUX.1-schnell`
-- Resolution: 512
-- Batch size: 1, LoRA rank: 4
+- Resolution: 384
+- Batch size: 1, LoRA rank: 2
+- 4-bit NF4 transformer (`--low_ram`)
 - Memory flags: gradient checkpointing, fp16, 8-bit Adam, latent caching
 - Libraries: install from `requirements-colab.txt` (pinned versions)
 
@@ -82,7 +83,7 @@ python inference/generate.py \
   --prompt "a cozy cafe in rain" \
   --lora_path ./training/output/mystyle_flux_lora.safetensors \
   --base_model black-forest-labs/FLUX.1-schnell \
-  --width 512 --height 512 \
+  --width 384 --height 384 \
   --output ./inference/outputs/sample.png
 ```
 
