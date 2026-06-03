@@ -62,28 +62,47 @@ def bundled_training_script() -> Path:
     return Path(__file__).resolve().parent / "_hf_scripts" / "train_dreambooth_lora_flux.py"
 
 
+def script_is_compatible(content: str) -> bool:
+    return (
+        'check_min_version("0.34.0")' in content
+        and "_collate_lora_metadata" in content
+    )
+
+
+def write_compatible_script(script_path: Path, content: str) -> None:
+    if not script_is_compatible(content):
+        raise RuntimeError(
+            "Downloaded training script is not compatible with diffusers 0.34.0. "
+            "Re-clone the repo or run: git pull"
+        )
+    script_path.write_text(content, encoding="utf-8")
+    (script_path.parent / ".diffusers_train_tag").write_text(DIFFUSERS_TRAIN_TAG, encoding="utf-8")
+
+
 def ensure_diffusers_script(script_path: Path) -> None:
-    bundled = bundled_training_script()
     script_path.parent.mkdir(parents=True, exist_ok=True)
 
-    if bundled.exists():
-        if bundled.resolve() != script_path.resolve():
-            script_path.write_text(bundled.read_text(encoding="utf-8"), encoding="utf-8")
-        version_marker = script_path.parent / ".diffusers_train_tag"
-        version_marker.write_text(DIFFUSERS_TRAIN_TAG, encoding="utf-8")
-        return
-
-    version_marker = script_path.parent / ".diffusers_train_tag"
-    if script_path.exists() and version_marker.exists():
-        if version_marker.read_text(encoding="utf-8").strip() == DIFFUSERS_TRAIN_TAG:
+    if script_path.exists():
+        existing = script_path.read_text(encoding="utf-8")
+        if script_is_compatible(existing):
             return
-        script_path.unlink(missing_ok=True)
 
+    bundled = bundled_training_script()
+    if bundled.exists():
+        bundled_text = bundled.read_text(encoding="utf-8")
+        if script_is_compatible(bundled_text):
+            write_compatible_script(script_path, bundled_text)
+            print(f"Using bundled training script: {bundled}")
+            return
+
+    script_path.unlink(missing_ok=True)
     subprocess.run(
         ["curl", "-L", DIFFUSERS_TRAIN_SCRIPT, "-o", str(script_path)],
         check=True,
     )
-    version_marker.write_text(DIFFUSERS_TRAIN_TAG, encoding="utf-8")
+    downloaded = script_path.read_text(encoding="utf-8")
+    write_compatible_script(script_path, downloaded)
+    print(f"Downloaded training script from {DIFFUSERS_TRAIN_TAG}")
 
 
 def count_training_images(dataset_dir: Path) -> int:
